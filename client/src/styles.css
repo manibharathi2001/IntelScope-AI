@@ -1,0 +1,21 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+:root { font-family: 'Space Grotesk', sans-serif; color: #e9e5d9; background: #11120f; font-synthesis: none; }
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; }
+.shell { min-height: 100vh; max-width: 1320px; margin: auto; padding: 28px 6vw 70px; background: radial-gradient(circle at 80% 10%, #293529 0, transparent 31%), #11120f; }
+nav { display: flex; justify-content: space-between; border-bottom: 1px solid #42463b; padding-bottom: 20px; font-family: 'DM Mono', monospace; font-size: 11px; letter-spacing: .12em; color: #a4aa96; }
+.brand { color: #d7ebac; font-weight: 500; }
+.hero { padding: 15vh 0 12vh; max-width: 850px; }
+.eyebrow { color: #a6c77b; font: 11px 'DM Mono', monospace; letter-spacing: .16em; }
+h1 { font-size: clamp(4rem, 10vw, 9rem); line-height: .86; letter-spacing: -.08em; margin: 25px 0; font-weight: 600; }
+h1 em { color: #a6c77b; font-style: normal; }
+.intro { color: #a4aa96; font-size: clamp(1.1rem, 2vw, 1.4rem); max-width: 490px; line-height: 1.5; }
+.status { display: flex; gap: 12px; align-items: center; margin-top: 38px; color: #d7ebac; font: 12px 'DM Mono', monospace; }
+.dot { width: 7px; height: 7px; background: #a6c77b; border-radius: 50%; box-shadow: 0 0 14px #a6c77b; }
+.divider { width: 1px; height: 17px; background: #42463b; }
+.cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: #42463b; border: 1px solid #42463b; }
+.cards article { background: #171914; padding: 30px; min-height: 190px; }
+.cards span { color: #a6c77b; font: 12px 'DM Mono', monospace; }
+.cards h2 { font-size: 1.25rem; font-weight: 500; margin: 35px 0 10px; }
+.cards p { color: #858b7c; line-height: 1.5; margin: 0; }
+@media (max-width: 700px) { .shell { padding-inline: 24px; } .hero { padding-top: 100px; } .cards { grid-template-columns: 1fr; } .nav-state { display: none; } }
