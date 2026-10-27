@@ -1,7 +1,9 @@
 import { Router } from "express";
 import { Case } from "../models/Case.js";
 import { requireAuth } from "../middleware/auth.js";
-import { generateMystery } from "../services/gemini.js";
+import { askInvestigator, generateMystery } from "../services/gemini.js";
+import { InvestigationNote } from "../models/InvestigationNote.js";
+import { ClueConnection } from "../models/ClueConnection.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -30,6 +32,62 @@ router.get("/:id", async (req, res, next) => {
     const mysteryCase = await Case.findOne({ _id: req.params.id, owner: req.user.id });
     if (!mysteryCase) return res.status(404).json({ message: "Case not found" });
     res.json(mysteryCase);
+  } catch (error) { next(error); }
+});
+
+router.get("/:id/notes", async (req, res, next) => {
+  try {
+    const ownsCase = await Case.exists({ _id: req.params.id, owner: req.user.id });
+    if (!ownsCase) return res.status(404).json({ message: "Case not found" });
+    res.json(await InvestigationNote.find({ caseId: req.params.id, owner: req.user.id }).sort({ createdAt: -1 }));
+  } catch (error) { next(error); }
+});
+
+router.post("/:id/notes", async (req, res, next) => {
+  try {
+    const ownsCase = await Case.exists({ _id: req.params.id, owner: req.user.id });
+    if (!ownsCase) return res.status(404).json({ message: "Case not found" });
+    if (!req.body.content?.trim()) return res.status(400).json({ message: "Note content is required" });
+    const note = await InvestigationNote.create({ owner: req.user.id, caseId: req.params.id, content: req.body.content, evidenceId: req.body.evidenceId || null });
+    res.status(201).json(note);
+  } catch (error) { next(error); }
+});
+
+router.get("/:id/timeline", async (req, res, next) => {
+  try {
+    const mysteryCase = await Case.findOne({ _id: req.params.id, owner: req.user.id });
+    if (!mysteryCase) return res.status(404).json({ message: "Case not found" });
+    const timeline = (mysteryCase.evidence || []).filter((item) => item.timestamp).sort((a, b) => String(a.timestamp).localeCompare(String(b.timestamp))).map((item) => ({ evidenceId: item.evidenceId, title: item.title, timestamp: item.timestamp, location: item.location || null }));
+    res.json(timeline);
+  } catch (error) { next(error); }
+});
+
+router.get("/:id/connections", async (req, res, next) => {
+  try {
+    if (!await Case.exists({ _id: req.params.id, owner: req.user.id })) return res.status(404).json({ message: "Case not found" });
+    res.json(await ClueConnection.find({ caseId: req.params.id, owner: req.user.id }).sort({ createdAt: -1 }));
+  } catch (error) { next(error); }
+});
+
+router.post("/:id/connections", async (req, res, next) => {
+  try {
+    const mysteryCase = await Case.findOne({ _id: req.params.id, owner: req.user.id });
+    if (!mysteryCase) return res.status(404).json({ message: "Case not found" });
+    const { fromEvidenceId, toEvidenceId, relationship, explanation } = req.body;
+    const validIds = new Set((mysteryCase.evidence || []).map((item) => item.evidenceId));
+    if (!validIds.has(fromEvidenceId) || !validIds.has(toEvidenceId) || !["supports", "contradicts", "related"].includes(relationship) || !explanation?.trim()) return res.status(400).json({ message: "Valid evidence IDs, relationship, and explanation are required" });
+    res.status(201).json(await ClueConnection.create({ owner: req.user.id, caseId: req.params.id, fromEvidenceId, toEvidenceId, relationship, explanation: explanation.trim() }));
+  } catch (error) { next(error); }
+});
+
+router.post("/:id/assistant", async (req, res, next) => {
+  try {
+    const mysteryCase = await Case.findOne({ _id: req.params.id, owner: req.user.id });
+    if (!mysteryCase) return res.status(404).json({ message: "Case not found" });
+    if (mysteryCase.status !== "ready") return res.status(409).json({ message: "Generate the investigation before asking questions" });
+    if (!req.body.question?.trim()) return res.status(400).json({ message: "Question is required" });
+    const answer = await askInvestigator({ caseData: mysteryCase.toObject(), question: req.body.question.trim(), history: req.body.history });
+    res.json(answer);
   } catch (error) { next(error); }
 });
 

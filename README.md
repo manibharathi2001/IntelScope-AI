@@ -12,6 +12,10 @@ Phase 1 provides account creation, login, protected case creation, and case list
 
 Phase 2 adds `POST /api/cases/:id/generate`. It sends the case scenario to Gemini, validates the structured response, and stores the incident, suspects, clues, evidence, and hidden solution. Normal case reads never select the hidden solution. Configure `GEMINI_API_KEY` and optionally `GEMINI_MODEL` in `server/.env` before using generation.
 
+Phase 3 adds the investigator workspace: account screens, a case archive, case creation, evidence filtering and inspection, suspect profiles, and case-linked field notes.
+
+Phase 4 adds evidence-grounded assistant responses, timestamp-sorted timelines, and persisted clue connections. The assistant receives only public case data and filters its evidence references against the case's real evidence IDs.
+
 Useful endpoints:
 
 - `GET /api/health`
@@ -21,3 +25,9 @@ Useful endpoints:
 - `POST /api/cases`
 - `POST /api/cases/:id/generate`
 - `GET /api/cases/:id`
+- `GET /api/cases/:id/notes`
+- `POST /api/cases/:id/notes`
+- `GET /api/cases/:id/timeline`
+- `GET /api/cases/:id/connections`
+- `POST /api/cases/:id/connections`
+- `POST /api/cases/:id/assistant`

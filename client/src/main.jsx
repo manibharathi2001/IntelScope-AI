@@ -1,24 +1,38 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
 
-function App() {
-  return (
-    <main className="shell">
-      <nav><span className="brand">INTELSCOPE</span><span className="nav-state">PHASE 1 / FOUNDATION</span></nav>
-      <section className="hero">
-        <p className="eyebrow">AI MYSTERY INVESTIGATION PLATFORM</p>
-        <h1>Every mystery<br /><em>leaves a trace.</em></h1>
-        <p className="intro">Create a case from your own story, then follow the evidence until the truth reveals itself.</p>
-        <div className="status"><span className="dot" />Foundation online<span className="divider" />Case creation is next</div>
-      </section>
-      <section className="cards">
-        <article><span>01</span><h2>Create a case</h2><p>Describe an incident, choose a difficulty, and prepare it for investigation.</p></article>
-        <article><span>02</span><h2>Examine evidence</h2><p>Review suspects, clues, conversations, documents, and the timeline.</p></article>
-        <article><span>03</span><h2>Find the truth</h2><p>Connect contradictions, question the assistant, and submit your theory.</p></article>
-      </section>
-    </main>
-  );
+const API = "http://localhost:5000/api";
+async function request(path, options = {}, token) {
+  const response = await fetch(`${API}${path}`, { ...options, headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) } });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.message || data.detail || "Request failed");
+  return data;
 }
 
+function Auth({ onAuthenticated }) {
+  const [register, setRegister] = useState(false); const [form, setForm] = useState({ name: "", email: "", password: "" }); const [error, setError] = useState("");
+  async function submit(event) { event.preventDefault(); setError(""); try { const result = await request(`/auth/${register ? "register" : "login"}`, { method: "POST", body: JSON.stringify(form) }); localStorage.setItem("intelscope-token", result.token); onAuthenticated(result); } catch (err) { setError(err.message); } }
+  return <main className="auth shell"><nav><span className="brand">INTELSCOPE</span><span className="nav-state">SECURE ACCESS</span></nav><div className="auth-card"><p className="eyebrow">INVESTIGATOR ACCESS</p><h1>{register ? "Open a case file." : "Welcome back, investigator."}</h1><form onSubmit={submit}>{register && <input placeholder="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />}<input required type="email" placeholder="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /><input required minLength="8" type="password" placeholder="Password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />{error && <p className="error">{error}</p>}<button className="primary">{register ? "Create account" : "Sign in"}</button></form><button className="link-button" onClick={() => setRegister(!register)}>{register ? "Already have an account? Sign in" : "New investigator? Create an account"}</button></div></main>;
+}
+
+function Dashboard({ token, user, onOpen, onLogout }) {
+  const [cases, setCases] = useState([]); const [form, setForm] = useState({ title: "", scenario: "", difficulty: "medium" }); const [error, setError] = useState("");
+  const load = () => request("/cases", {}, token).then(setCases).catch((err) => setError(err.message)); useEffect(load, [token]);
+  async function createCase(event) { event.preventDefault(); try { const created = await request("/cases", { method: "POST", body: JSON.stringify(form) }, token); setForm({ title: "", scenario: "", difficulty: "medium" }); setCases([created, ...cases]); onOpen(created._id); } catch (err) { setError(err.message); } }
+  return <main className="app shell"><nav><span className="brand">INTELSCOPE</span><span className="nav-state">INVESTIGATOR / {user.name.toUpperCase()}</span><button className="quiet" onClick={onLogout}>Sign out</button></nav><section className="dashboard-head"><div><p className="eyebrow">CASE ARCHIVE</p><h1>Your investigations.</h1></div><span className="case-count">{cases.length.toString().padStart(2, "0")} CASES</span></section><div className="dashboard-grid"><form className="panel create-panel" onSubmit={createCase}><p className="eyebrow">NEW CASE</p><h2>Start with a story.</h2><input required placeholder="Case title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /><textarea required placeholder="Describe the incident or mystery..." value={form.scenario} onChange={(e) => setForm({ ...form, scenario: e.target.value })} /><select value={form.difficulty} onChange={(e) => setForm({ ...form, difficulty: e.target.value })}><option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option></select><button className="primary">Create case file</button>{error && <p className="error">{error}</p>}</form><section className="case-list"><p className="eyebrow">RECENT FILES</p>{cases.length === 0 ? <div className="empty">Your archive is waiting for its first mystery.</div> : cases.map((item) => <button className="case-row" key={item._id} onClick={() => onOpen(item._id)}><span><strong>{item.title}</strong><small>{item.scenario.slice(0, 90)}{item.scenario.length > 90 ? "…" : ""}</small></span><em>{item.status}</em></button>)}</section></div></main>;
+}
+
+function Workspace({ token, caseId, onBack }) {
+  const [mysteryCase, setMysteryCase] = useState(null); const [notes, setNotes] = useState([]); const [filter, setFilter] = useState("all"); const [selected, setSelected] = useState(null); const [note, setNote] = useState(""); const [busy, setBusy] = useState(false); const [error, setError] = useState("");
+  async function load() { try { const [loaded, loadedNotes] = await Promise.all([request(`/cases/${caseId}`, {}, token), request(`/cases/${caseId}/notes`, {}, token)]); setMysteryCase(loaded); setNotes(loadedNotes); } catch (err) { setError(err.message); } }
+  useEffect(() => { load(); }, [caseId]);
+  if (!mysteryCase) return <main className="shell"><p className="loading">Loading case file…</p>{error && <p className="error">{error}</p>}</main>;
+  const evidence = mysteryCase.evidence || []; const filtered = filter === "all" ? evidence : evidence.filter((item) => item.type === filter);
+  async function generate() { setBusy(true); setError(""); try { await request(`/cases/${caseId}/generate`, { method: "POST" }, token); await load(); } catch (err) { setError(err.message); } finally { setBusy(false); } }
+  async function saveNote(event) { event.preventDefault(); if (!note.trim()) return; try { const saved = await request(`/cases/${caseId}/notes`, { method: "POST", body: JSON.stringify({ content: note, evidenceId: selected?.evidenceId }) }, token); setNotes([saved, ...notes]); setNote(""); } catch (err) { setError(err.message); } }
+  return <main className="app shell"><nav><button className="quiet" onClick={onBack}>← Archive</button><span className="brand">INTELSCOPE</span><span className="nav-state">CASE FILE / {mysteryCase.status.toUpperCase()}</span></nav><header className="case-header"><div><p className="eyebrow">INVESTIGATION WORKSPACE</p><h1>{mysteryCase.title}</h1><p>{mysteryCase.summary || mysteryCase.scenario}</p></div>{mysteryCase.status !== "ready" && <button className="primary" disabled={busy} onClick={generate}>{busy ? "Generating…" : "Generate investigation"}</button>}</header>{error && <p className="error">{error}</p>}<div className="workspace-grid"><aside className="panel suspects"><p className="eyebrow">SUSPECTS / {(mysteryCase.suspects || []).length}</p>{(mysteryCase.suspects || []).map((suspect) => <article className="suspect" key={suspect.name}><strong>{suspect.name}</strong><span>{suspect.alibiStatus}</span><p>{suspect.profile}</p><small>Motive: {suspect.motive}</small></article>)}</aside><section className="panel evidence-panel"><div className="section-heading"><div><p className="eyebrow">EVIDENCE / {evidence.length}</p><h2>What the case leaves behind.</h2></div><select value={filter} onChange={(e) => setFilter(e.target.value)}><option value="all">All evidence</option>{[...new Set(evidence.map((item) => item.type))].map((type) => <option key={type} value={type}>{type}</option>)}</select></div><div className="evidence-list">{filtered.map((item) => <button className={`evidence-row ${selected?.evidenceId === item.evidenceId ? "selected" : ""}`} key={item.evidenceId} onClick={() => setSelected(item)}><span className="evidence-type">{item.type}</span><span><strong>{item.title}</strong><small>{item.content.slice(0, 120)}{item.content.length > 120 ? "…" : ""}</small></span><em>{item.evidenceId}</em></button>)}{!filtered.length && <div className="empty">Generate the investigation to reveal evidence.</div>}</div></section><aside className="panel detail-panel">{selected ? <><p className="eyebrow">{selected.evidenceId} / DETAIL</p><h2>{selected.title}</h2><p className="detail-content">{selected.content}</p><small>{selected.timestamp || "Timestamp unknown"}{selected.location ? ` · ${selected.location}` : ""}</small></> : <div className="empty">Select evidence to inspect it.</div>}<form className="note-form" onSubmit={saveNote}><p className="eyebrow">FIELD NOTE</p><textarea placeholder="Record an observation…" value={note} onChange={(e) => setNote(e.target.value)} /><button className="secondary">Save note</button></form><div className="notes"><p className="eyebrow">YOUR NOTES / {notes.length}</p>{notes.slice(0, 4).map((item) => <p key={item._id}>{item.content}</p>)}</div></aside></div></main>;
+}
+
+function App() { const [auth, setAuth] = useState(null); const [caseId, setCaseId] = useState(null); const token = localStorage.getItem("intelscope-token"); if (!auth && !token) return <Auth onAuthenticated={setAuth} />; const user = auth?.user || { name: "Investigator" }; if (caseId) return <Workspace token={token} caseId={caseId} onBack={() => setCaseId(null)} />; return <Dashboard token={token} user={user} onOpen={setCaseId} onLogout={() => { localStorage.removeItem("intelscope-token"); setAuth(null); }} />; }
 createRoot(document.getElementById("root")).render(<App />);

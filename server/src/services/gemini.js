@@ -44,3 +44,22 @@ User scenario: ${scenario}`;
   const result = await model.generateContent({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json", temperature: 0.7 } });
   return validateGeneration(cleanJson(result.response.text()));
 }
+
+export async function askInvestigator({ caseData, question, history = [] }) {
+  if (!process.env.GEMINI_API_KEY) throw new Error("GEMINI_API_KEY is not configured");
+  const client = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+  const model = client.getGenerativeModel({ model: process.env.GEMINI_MODEL || "gemini-2.0-flash" });
+  const publicCase = { title: caseData.title, summary: caseData.summary, incident: caseData.incident, suspects: caseData.suspects, clues: caseData.clues, evidence: caseData.evidence };
+  const prompt = `You are IntelScope's evidence-grounded investigation assistant. Answer the investigator's question using ONLY the fictional case data below.
+Never reveal or guess a hidden solution. Clearly separate established evidence from assumptions. If the data is insufficient, say so.
+Return ONLY valid JSON with: {"answer":"string","evidenceReferences":["evidence ID"],"uncertainties":["string"]}.
+Case data: ${JSON.stringify(publicCase)}
+Recent conversation: ${JSON.stringify(history.slice(-6))}
+Question: ${question}`;
+  const result = await model.generateContent({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json", temperature: 0.2 } });
+  const answer = cleanJson(result.response.text());
+  if (typeof answer.answer !== "string" || !Array.isArray(answer.evidenceReferences)) throw new Error("Assistant returned an invalid response");
+  const validIds = new Set((caseData.evidence || []).map((item) => item.evidenceId));
+  answer.evidenceReferences = answer.evidenceReferences.filter((id) => validIds.has(id));
+  return answer;
+}

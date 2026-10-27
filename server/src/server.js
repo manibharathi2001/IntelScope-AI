@@ -1,6 +1,8 @@
-import "dotenv/config";
+import dotenv from "dotenv";
 import { app } from "./app.js";
 import { connectDatabase } from "./config/db.js";
+
+dotenv.config({ path: new URL("../.env", import.meta.url) });
 
 const port = process.env.PORT || 5000;
 connectDatabase().then(() => app.listen(port, () => console.log(`IntelScope API listening on ${port}`))).catch((error) => {
