@@ -16,6 +16,8 @@ Phase 3 adds the investigator workspace: account screens, a case archive, case c
 
 Phase 4 adds evidence-grounded assistant responses, timestamp-sorted timelines, and persisted clue connections. The assistant receives only public case data and filters its evidence references against the case's real evidence IDs.
 
+Phase 5 adds culprit submission and report generation. The stored solution is used for consistent evaluation, while the actual culprit and explanation remain hidden until the explicit reveal endpoint is called.
+
 Useful endpoints:
 
 - `GET /api/health`
@@ -31,3 +33,6 @@ Useful endpoints:
 - `GET /api/cases/:id/connections`
 - `POST /api/cases/:id/connections`
 - `POST /api/cases/:id/assistant`
+- `POST /api/cases/:id/conclusion`
+- `GET /api/cases/:id/report`
+- `POST /api/cases/:id/report/reveal`
